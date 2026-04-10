@@ -47,9 +47,8 @@ PluginComponent {
     }
 
     // ── Popup state ───────────────────────────────────────────────────────
-    property bool showPopup:      false
-    property real popupTargetX:   0
-    property bool _popupOpenGuard: false
+    property bool showPopup:    false
+    property real popupTargetX: 0
 
     // ── Notification / sound helpers ──────────────────────────────────────
     property string _notifyTitle: ""
@@ -106,13 +105,6 @@ PluginComponent {
         _notifyBody  = body
         _doNotify    = true
         if (soundEnabled && soundFilePath !== "") _doSound = true
-    }
-
-    // ── Popup open guard (prevents spurious onActiveChanged close on Wayland) ──
-    Timer {
-        id: popupGuard
-        interval: 250
-        onTriggered: root._popupOpenGuard = false
     }
 
     // ── Countdown ─────────────────────────────────────────────────────────
@@ -262,26 +254,22 @@ PluginComponent {
 
     pillClickAction: function(x, y, width, section, screen) {
         root.popupTargetX = x + width / 2
-        if (!root.showPopup) {
-            root._popupOpenGuard = true
-            popupGuard.restart()
-        }
-        root.showPopup = !root.showPopup
+        popupWin.visible = !popupWin.visible
+        root.showPopup = popupWin.visible
     }
 
     // ── Popup window ──────────────────────────────────────────────────────
     Window {
         id: popupWin
-        visible: root.showPopup
-        flags:   Qt.Popup | Qt.FramelessWindowHint
-        width:   268
-        height:  rootCol.implicitHeight + 32
-        color:   "transparent"
+        flags:  Qt.Popup | Qt.FramelessWindowHint
+        width:  268
+        height: rootCol.implicitHeight + 32
+        color:  "transparent"
 
         x: Math.max(0, Math.round(root.popupTargetX - width / 2))
         y: root.barThickness + 4
 
-        onActiveChanged: if (!active && !root._popupOpenGuard) root.showPopup = false
+        onVisibleChanged: if (!visible) root.showPopup = false
 
         Rectangle {
             anchors.fill: parent
