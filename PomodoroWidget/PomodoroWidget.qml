@@ -329,10 +329,12 @@ PluginComponent {
                         height: 128
                         anchors.centerIn: parent
 
-                        property real  progress: root.arcProgress
-                        property color arcColor: Theme.primary
-                        onProgressChanged: requestPaint()
-                        onArcColorChanged: requestPaint()
+                        property real  progress:    root.arcProgress
+                        property color arcColor:    Theme.primary
+                        property bool  nearHandle:  false
+                        onProgressChanged:   requestPaint()
+                        onArcColorChanged:   requestPaint()
+                        onNearHandleChanged: requestPaint()
 
                         SequentialAnimation on opacity {
                             running: root.paused && !root.isIdle
@@ -363,6 +365,16 @@ PluginComponent {
                                 ctx.lineWidth   = sw
                                 ctx.lineCap     = "round"
                                 ctx.stroke()
+
+                                // Drag handle knob at arc tip
+                                var tipAngle = start + progress * 2 * Math.PI
+                                var kx = cx + r * Math.cos(tipAngle)
+                                var ky = cy + r * Math.sin(tipAngle)
+                                var knobR = nearHandle ? 7 : 5
+                                ctx.beginPath()
+                                ctx.arc(kx, ky, knobR, 0, 2 * Math.PI, false)
+                                ctx.fillStyle = String(arcColor)
+                                ctx.fill()
                             }
                         }
 
@@ -372,6 +384,55 @@ PluginComponent {
                             color: Theme.surfaceText
                             font.pixelSize: 22
                             font.weight: Font.Bold
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            property bool isDragging: false
+                            cursorShape: isDragging        ? Qt.ClosedHandCursor
+                                       : bigArc.nearHandle ? Qt.OpenHandCursor
+                                       : Qt.ArrowCursor
+
+                            function arcR() {
+                                return (Math.min(bigArc.width, bigArc.height) - 9) / 2
+                            }
+                            function knobCenter() {
+                                var cx = bigArc.width / 2
+                                var cy = bigArc.height / 2
+                                var a  = -Math.PI / 2 + root.arcProgress * 2 * Math.PI
+                                return { x: cx + arcR() * Math.cos(a), y: cy + arcR() * Math.sin(a) }
+                            }
+                            function distToKnob(mx, my) {
+                                var k = knobCenter()
+                                return Math.sqrt(Math.pow(mx - k.x, 2) + Math.pow(my - k.y, 2))
+                            }
+                            function angleToRemaining(mx, my) {
+                                var cx = bigArc.width / 2
+                                var cy = bigArc.height / 2
+                                var angle = Math.atan2(my - cy, mx - cx)
+                                var prog = (angle + Math.PI / 2) / (2 * Math.PI)
+                                if (prog < 0) prog += 1
+                                prog = Math.max(0.01, Math.min(0.99, prog))
+                                var secs = root.isWork
+                                           ? (1 - prog) * root.totalSecs
+                                           : prog * root.totalSecs
+                                secs = Math.round(secs / 60) * 60
+                                return Math.max(60, Math.min(root.totalSecs, secs))
+                            }
+
+                            onPressed: {
+                                if (root.isIdle) return
+                                if (distToKnob(mouseX, mouseY) < 18) isDragging = true
+                            }
+                            onPositionChanged: {
+                                if (!root.isIdle)
+                                    bigArc.nearHandle = distToKnob(mouseX, mouseY) < 18
+                                if (isDragging)
+                                    root.remainingSecs = angleToRemaining(mouseX, mouseY)
+                            }
+                            onReleased: isDragging = false
+                            onExited:   bigArc.nearHandle = false
                         }
                     }
                 }

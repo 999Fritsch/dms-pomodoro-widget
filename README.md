@@ -23,14 +23,14 @@ chmod +x install.sh
 
 Then restart DankMaterialShell (`Super+Shift+R` or re-login).
 
-The widget appears in the **center bar, left of the Military DTG clock**.
+The widget appears at the **start of the center bar**.
 
 ## Manual Installation
 
 If you prefer to install manually:
 
 1. Copy `PomodoroWidget/` to `~/.config/DankMaterialShell/plugins/`
-2. In `~/.config/DankMaterialShell/settings.json`, add `"pomodoroWidget"` to `centerWidgets` before `"militaryDtgWidget"`
+2. In `~/.config/DankMaterialShell/settings.json`, add `"pomodoroWidget"` to the start of `centerWidgets`
 3. In `~/.config/DankMaterialShell/plugin_settings.json`, add the defaults block below
 4. Restart DMS
 
