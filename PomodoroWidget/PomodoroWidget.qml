@@ -320,9 +320,11 @@ PluginComponent {
                         property real  progress:    root.arcProgress
                         property color arcColor:    Theme.primary
                         property bool  nearHandle:  false
+                        property bool  active:      !root.isIdle
                         onProgressChanged:   requestPaint()
                         onArcColorChanged:   requestPaint()
                         onNearHandleChanged: requestPaint()
+                        onActiveChanged:     requestPaint()
 
                         SequentialAnimation on opacity {
                             running: root.paused && !root.isIdle
@@ -345,16 +347,18 @@ PluginComponent {
                             ctx.lineWidth   = sw
                             ctx.stroke()
 
+                            var start = -Math.PI / 2
                             if (progress > 0.005) {
-                                var start = -Math.PI / 2
                                 ctx.beginPath()
                                 ctx.arc(cx, cy, r, start, start + progress * 2 * Math.PI, false)
                                 ctx.strokeStyle = String(arcColor)
                                 ctx.lineWidth   = sw
                                 ctx.lineCap     = "round"
                                 ctx.stroke()
+                            }
 
-                                // Drag handle knob at arc tip
+                            // Drag handle knob — visible from the first tick
+                            if (active) {
                                 var tipAngle = start + progress * 2 * Math.PI
                                 var kx = cx + r * Math.cos(tipAngle)
                                 var ky = cy + r * Math.sin(tipAngle)
