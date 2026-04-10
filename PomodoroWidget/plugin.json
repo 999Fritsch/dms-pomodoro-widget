@@ -1,0 +1,16 @@
+{
+    "id": "pomodoroWidget",
+    "name": "Pomodoro Timer",
+    "description": "Study timer with circular progress and break tracking",
+    "version": "1.0.0",
+    "author": "Local",
+    "type": "widget",
+    "capabilities": ["dankbar-widget"],
+    "component": "./PomodoroWidget.qml",
+    "icon": "timer",
+    "settings": "./PomodoroSettings.qml",
+    "permissions": [
+        "settings_read",
+        "settings_write"
+    ]
+}
