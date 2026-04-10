@@ -47,8 +47,9 @@ PluginComponent {
     }
 
     // ── Popup state ───────────────────────────────────────────────────────
-    property bool showPopup:    false
-    property real popupTargetX: 0
+    property bool showPopup:      false
+    property real popupTargetX:   0
+    property bool _popupOpenGuard: false
 
     // ── Notification / sound helpers ──────────────────────────────────────
     property string _notifyTitle: ""
@@ -105,6 +106,13 @@ PluginComponent {
         _notifyBody  = body
         _doNotify    = true
         if (soundEnabled && soundFilePath !== "") _doSound = true
+    }
+
+    // ── Popup open guard (prevents spurious onActiveChanged close on Wayland) ──
+    Timer {
+        id: popupGuard
+        interval: 250
+        onTriggered: root._popupOpenGuard = false
     }
 
     // ── Countdown ─────────────────────────────────────────────────────────
@@ -254,6 +262,10 @@ PluginComponent {
 
     pillClickAction: function(x, y, width, section, screen) {
         root.popupTargetX = x + width / 2
+        if (!root.showPopup) {
+            root._popupOpenGuard = true
+            popupGuard.restart()
+        }
         root.showPopup = !root.showPopup
     }
 
@@ -269,7 +281,7 @@ PluginComponent {
         x: Math.max(0, Math.round(root.popupTargetX - width / 2))
         y: root.barThickness + 4
 
-        onActiveChanged: if (!active) root.showPopup = false
+        onActiveChanged: if (!active && !root._popupOpenGuard) root.showPopup = false
 
         Rectangle {
             anchors.fill: parent

@@ -39,7 +39,7 @@ mkdir -p "$TARGET_DIR"
 cp -r "$PLUGIN_SRC/." "$TARGET_DIR/"
 echo "  Done."
 
-# 2. Add widget to settings.json (left of militaryDtgWidget in centerWidgets)
+# 2. Add widget to settings.json (insert at index 0 of centerWidgets)
 echo "→ Patching settings.json ..."
 if python3 -c "import json; d=json.load(open('$SETTINGS_FILE')); exit(0 if 'pomodoroWidget' in str(d) else 1)" 2>/dev/null; then
     echo "  pomodoroWidget already present — skipping."
@@ -57,12 +57,7 @@ def patch(obj):
             cw = obj["centerWidgets"]
             ids = [w if isinstance(w, str) else w.get("id", "") for w in cw]
             if "pomodoroWidget" not in ids:
-                # Insert left of militaryDtgWidget, or at position 0 if not found
-                try:
-                    idx = ids.index("militaryDtgWidget")
-                except ValueError:
-                    idx = 0
-                cw.insert(idx, "pomodoroWidget")
+                cw.insert(0, "pomodoroWidget")
         for v in obj.values():
             patch(v)
     elif isinstance(obj, list):
@@ -115,7 +110,7 @@ echo "✓ Installation complete!"
 echo ""
 echo "  Next steps:"
 echo "  1. Restart DankMaterialShell (Super+Shift+R or re-login)"
-echo "  2. The Pomodoro widget appears in the center bar, left of the DTG clock"
+echo "  2. The Pomodoro widget appears at the start of the center bar"
 echo "  3. Click it to open the timer popup"
 echo ""
 echo "  To configure: open DMS settings → Plugins → Pomodoro Timer"
