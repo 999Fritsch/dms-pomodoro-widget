@@ -67,9 +67,9 @@ PluginComponent {
     }
 
     function startBreak() {
-        const long = pomosUntilLong > 0 && (pomodorosDone % pomosUntilLong === 0)
-        mode = long ? 3 : 2
-        remainingSecs = long ? longBreakSecs : shortBreakSecs
+        var isLong = pomosUntilLong > 0 && (pomodorosDone % pomosUntilLong === 0)
+        mode = isLong ? 3 : 2
+        remainingSecs = isLong ? longBreakSecs : shortBreakSecs
         running = true; paused = false
     }
 
