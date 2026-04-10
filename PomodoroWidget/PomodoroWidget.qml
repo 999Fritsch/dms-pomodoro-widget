@@ -1,12 +1,9 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
-
-// NOTE on popup window: We use a plain Window (Qt.Popup) as the popup mechanism.
-// On Wayland without XWayland, window positioning may be handled by the compositor.
-// If the popup appears in the wrong place, see README for the WlrLayerShell alternative.
 
 PluginComponent {
     id: root
@@ -41,7 +38,7 @@ PluginComponent {
         return 0
     }
 
-    // Work: fills 0→1 (CW).  Break: empties 1→0 (arc retreats CCW from leading edge).
+    // Work: fills 0→1 (CW).  Break: empties 1→0 (leading edge retreats CCW).
     readonly property real arcProgress: {
         if (isIdle || totalSecs === 0) return 0
         if (isWork) return (totalSecs - remainingSecs) / totalSecs
@@ -49,8 +46,8 @@ PluginComponent {
     }
 
     // ── Popup state ───────────────────────────────────────────────────────
-    property bool showPopup: false
-    property real popupTargetX: 0   // screen x center of the widget
+    property bool showPopup:    false
+    property real popupTargetX: 0
 
     // ── Notification / sound helpers ──────────────────────────────────────
     property string _notifyTitle: ""
@@ -67,9 +64,9 @@ PluginComponent {
     }
 
     function startBreak() {
-        var isLong = pomosUntilLong > 0 && (pomodorosDone % pomosUntilLong === 0)
-        mode = isLong ? 3 : 2
-        remainingSecs = isLong ? longBreakSecs : shortBreakSecs
+        var isLongBreak = pomosUntilLong > 0 && (pomodorosDone % pomosUntilLong === 0)
+        mode = isLongBreak ? 3 : 2
+        remainingSecs = isLongBreak ? longBreakSecs : shortBreakSecs
         running = true; paused = false
     }
 
@@ -150,21 +147,18 @@ PluginComponent {
             readonly property real spacing: 5
 
             implicitWidth:  root.isIdle
-                            ? iconTxt.implicitWidth
+                            ? idleIcon.implicitWidth
                             : arcSz + spacing + countTxt.implicitWidth
             implicitHeight: root.barThickness
 
             // ── Idle: themed timer icon ──────────────────────────────────
-            Text {
-                id: iconTxt
+            DankIcon {
+                id: idleIcon
                 anchors.centerIn: parent
                 visible: root.isIdle
-                // Material Icons: timer = U+E425
-                font.family: "Material Icons"
-                text: "\ue425"
-                font.pixelSize: Math.round(pill.fsz * 1.15)
+                name:  "timer"
+                size:  Math.round(pill.fsz * 1.15)
                 color: Theme.primary
-                renderType: Text.NativeRendering
             }
 
             // ── Running/Paused/Break: arc + count ────────────────────────
@@ -179,12 +173,11 @@ PluginComponent {
                     height: pill.arcSz
                     anchors.verticalCenter: parent.verticalCenter
 
-                    property real  progress:    root.arcProgress
-                    property color arcColor:    Theme.primary
+                    property real  progress: root.arcProgress
+                    property color arcColor: Theme.primary
                     onProgressChanged: requestPaint()
                     onArcColorChanged: requestPaint()
 
-                    // Pulse when paused
                     SequentialAnimation on opacity {
                         running: root.paused && !root.isIdle
                         loops:   Animation.Infinite
@@ -196,25 +189,20 @@ PluginComponent {
                     onPaint: {
                         var ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
+                        var cx = width / 2, cy = height / 2
+                        var sw = Math.max(2, Math.round(width * 0.14))
+                        var r  = (Math.min(width, height) - sw) / 2
 
-                        var cx  = width  / 2
-                        var cy  = height / 2
-                        var sw  = Math.max(2, Math.round(width * 0.14))
-                        var r   = (Math.min(width, height) - sw) / 2
-
-                        // Faint background ring
                         ctx.beginPath()
                         ctx.arc(cx, cy, r, 0, 2 * Math.PI, false)
                         ctx.strokeStyle = Qt.rgba(arcColor.r, arcColor.g, arcColor.b, 0.18)
                         ctx.lineWidth   = sw
                         ctx.stroke()
 
-                        // Progress arc
                         if (progress > 0.005) {
                             var start = -Math.PI / 2
-                            var end   = start + progress * 2 * Math.PI
                             ctx.beginPath()
-                            ctx.arc(cx, cy, r, start, end, false)
+                            ctx.arc(cx, cy, r, start, start + progress * 2 * Math.PI, false)
                             ctx.strokeStyle = String(arcColor)
                             ctx.lineWidth   = sw
                             ctx.lineCap     = "round"
@@ -223,10 +211,10 @@ PluginComponent {
                     }
                 }
 
-                Text {
+                StyledText {
                     id: countTxt
                     anchors.verticalCenter: parent.verticalCenter
-                    text: String(root.pomodorosDone)
+                    text:  String(root.pomodorosDone)
                     color: Theme.primary
                     font.pixelSize: Math.round(pill.fsz * 0.85)
                     font.weight: Font.Bold
@@ -242,15 +230,13 @@ PluginComponent {
             implicitWidth:  root.barThickness
             implicitHeight: root.isIdle ? Math.round(fsz * 1.4) : arcSz + 20
 
-            Text {
+            DankIcon {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.top: parent.top
                 visible: root.isIdle
-                font.family: "Material Icons"
-                text: "\ue425"
-                font.pixelSize: Math.round(fsz * 1.15)
+                name:  "timer"
+                size:  Math.round(fsz * 1.15)
                 color: Theme.primary
-                renderType: Text.NativeRendering
             }
         }
     }
@@ -261,24 +247,20 @@ PluginComponent {
     }
 
     // ── Popup window ──────────────────────────────────────────────────────
-    // Uses Qt.Popup (maps to xdg-popup on Wayland). Positioned below the bar,
-    // centered on the widget. On some compositors x/y may be overridden.
     Window {
         id: popupWin
-        visible:  root.showPopup
-        flags:    Qt.Popup | Qt.FramelessWindowHint
-        width:    268
-        height:   rootCol.implicitHeight + 32
-        color:    "transparent"
+        visible: root.showPopup
+        flags:   Qt.Popup | Qt.FramelessWindowHint
+        width:   268
+        height:  rootCol.implicitHeight + 32
+        color:   "transparent"
 
-        // Center on widget, just below bar
         x: Math.max(0, Math.round(root.popupTargetX - width / 2))
         y: root.barThickness + 4
 
         onActiveChanged: if (!active) root.showPopup = false
 
         Rectangle {
-            id: popupBg
             anchors.fill: parent
             radius: 14
             color:  Theme.surface
@@ -288,12 +270,12 @@ PluginComponent {
             Column {
                 id: rootCol
                 anchors {
-                    top:    parent.top
-                    left:   parent.left
-                    right:  parent.right
+                    top:   parent.top
+                    left:  parent.left
+                    right: parent.right
                     margins: 16
                 }
-                topPadding: 16
+                topPadding:    16
                 bottomPadding: 16
                 spacing: 14
 
@@ -302,9 +284,9 @@ PluginComponent {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     text: {
-                        if (root.isIdle)       return "Pomodoro Timer"
-                        if (root.isWork)       return "Work"
-                        if (root.mode === 3)   return "Long Break"
+                        if (root.isIdle)     return "Pomodoro Timer"
+                        if (root.isWork)     return "Work"
+                        if (root.mode === 3) return "Long Break"
                         return "Short Break"
                     }
                     color: Theme.primary
@@ -312,7 +294,7 @@ PluginComponent {
                     font.weight: Font.Bold
                 }
 
-                // ── Big arc + time display ───────────────────────────────
+                // ── Big arc + time ───────────────────────────────────────
                 Item {
                     width: parent.width
                     height: 136
@@ -323,8 +305,8 @@ PluginComponent {
                         height: 128
                         anchors.centerIn: parent
 
-                        property real  progress:  root.arcProgress
-                        property color arcColor:  Theme.primary
+                        property real  progress: root.arcProgress
+                        property color arcColor: Theme.primary
                         onProgressChanged: requestPaint()
                         onArcColorChanged: requestPaint()
 
@@ -339,25 +321,20 @@ PluginComponent {
                         onPaint: {
                             var ctx = getContext("2d")
                             ctx.clearRect(0, 0, width, height)
-
-                            var cx = width  / 2
-                            var cy = height / 2
+                            var cx = width / 2, cy = height / 2
                             var sw = 9
                             var r  = (Math.min(width, height) - sw) / 2
 
-                            // Background ring
                             ctx.beginPath()
                             ctx.arc(cx, cy, r, 0, 2 * Math.PI, false)
                             ctx.strokeStyle = Qt.rgba(arcColor.r, arcColor.g, arcColor.b, 0.13)
                             ctx.lineWidth   = sw
                             ctx.stroke()
 
-                            // Progress arc
                             if (progress > 0.005) {
                                 var start = -Math.PI / 2
-                                var end   = start + progress * 2 * Math.PI
                                 ctx.beginPath()
-                                ctx.arc(cx, cy, r, start, end, false)
+                                ctx.arc(cx, cy, r, start, start + progress * 2 * Math.PI, false)
                                 ctx.strokeStyle = String(arcColor)
                                 ctx.lineWidth   = sw
                                 ctx.lineCap     = "round"
@@ -365,12 +342,9 @@ PluginComponent {
                             }
                         }
 
-                        // Time text centered in arc
                         Text {
                             anchors.centerIn: parent
-                            text:  root.isIdle
-                                   ? "--:--"
-                                   : root.fmtTime(root.remainingSecs)
+                            text:  root.isIdle ? "--:--" : root.fmtTime(root.remainingSecs)
                             color: Theme.surfaceText
                             font.pixelSize: 22
                             font.weight: Font.Bold
@@ -379,7 +353,6 @@ PluginComponent {
                 }
 
                 // ── Session dots ─────────────────────────────────────────
-                // Shows progress through the current cycle (pomosUntilLong dots)
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
                     spacing: 7
@@ -403,17 +376,15 @@ PluginComponent {
                     // Play / Pause / Start
                     Rectangle {
                         width: 46; height: 46; radius: 23
-                        color:  Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.13)
-                        border.color: Theme.primary; border.width: 1
+                        color:        Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.13)
+                        border.color: Theme.primary
+                        border.width: 1
 
-                        Text {
+                        DankIcon {
                             anchors.centerIn: parent
-                            font.family: "Material Icons"
-                            font.pixelSize: 22
+                            name:  (root.isIdle || root.paused) ? "play_arrow" : "pause"
+                            size:  22
                             color: Theme.primary
-                            renderType: Text.NativeRendering
-                            // play_arrow = E037, pause = E034
-                            text: (root.isIdle || root.paused) ? "\ue037" : "\ue034"
                         }
 
                         MouseArea {
@@ -426,17 +397,15 @@ PluginComponent {
                     // Reset current timer
                     Rectangle {
                         width: 46; height: 46; radius: 23
-                        color:  Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
+                        color:        Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
                         border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
                         border.width: 1
 
-                        Text {
+                        DankIcon {
                             anchors.centerIn: parent
-                            font.family: "Material Icons"
-                            font.pixelSize: 22
+                            name:  "replay"
+                            size:  22
                             color: Theme.primary
-                            renderType: Text.NativeRendering
-                            text: "\ue042"  // replay
                         }
 
                         MouseArea {
@@ -449,18 +418,16 @@ PluginComponent {
                     // Skip (hidden when idle)
                     Rectangle {
                         width: 46; height: 46; radius: 23
-                        visible: !root.isIdle
-                        color:  Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
+                        visible:      !root.isIdle
+                        color:        Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.08)
                         border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
                         border.width: 1
 
-                        Text {
+                        DankIcon {
                             anchors.centerIn: parent
-                            font.family: "Material Icons"
-                            font.pixelSize: 22
+                            name:  "skip_next"
+                            size:  22
                             color: Theme.primary
-                            renderType: Text.NativeRendering
-                            text: "\ue044"  // skip_next
                         }
 
                         MouseArea {
@@ -476,13 +443,13 @@ PluginComponent {
                     width: parent.width
                     height: 36
                     radius: 8
-                    color:  Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.07)
+                    color:        Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.07)
                     border.color: Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.28)
                     border.width: 1
 
                     Text {
                         anchors.centerIn: parent
-                        text: "Reset Session  (" + root.pomodorosDone + " done)"
+                        text:  "Reset Session  (" + root.pomodorosDone + " done)"
                         color: Theme.primary
                         font.pixelSize: 12
                     }
