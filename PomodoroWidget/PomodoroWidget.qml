@@ -26,6 +26,7 @@ PluginComponent {
     property bool paused:        false
     property int  remainingSecs: 0
     property int  pomodorosDone: 0
+    property bool _breakPending: false
 
     readonly property bool isIdle:  mode === 0
     readonly property bool isWork:  mode === 1
@@ -64,6 +65,7 @@ PluginComponent {
     }
 
     function startBreak() {
+        _breakPending = false
         var isLongBreak = pomosUntilLong > 0 && (pomodorosDone % pomosUntilLong === 0)
         mode = isLongBreak ? 3 : 2
         remainingSecs = isLongBreak ? longBreakSecs : shortBreakSecs
@@ -75,7 +77,7 @@ PluginComponent {
     }
 
     function resetTimer() {
-        running = false; paused = false; mode = 0; remainingSecs = 0
+        running = false; paused = false; mode = 0; remainingSecs = 0; _breakPending = false
     }
 
     function resetSession() {
@@ -86,7 +88,12 @@ PluginComponent {
         if (isWork) {
             pomodorosDone++
             _notify("Pomodoro Complete!", "Time for a break.")
-            autoStartBreak ? startBreak() : resetTimer()
+            if (autoStartBreak) {
+                startBreak()
+            } else {
+                resetTimer()
+                _breakPending = true
+            }
         } else if (isBreak) {
             _notify("Break Over", "Time to focus!")
             resetTimer()
@@ -113,8 +120,12 @@ PluginComponent {
                 if (root.isWork) {
                     root.pomodorosDone++
                     root._notify("Pomodoro Complete!", "Time for a break.")
-                    if (root.autoStartBreak) root.startBreak()
-                    else root.mode = 0
+                    if (root.autoStartBreak) {
+                        root.startBreak()
+                    } else {
+                        root.mode = 0
+                        root._breakPending = true
+                    }
                 } else if (root.isBreak) {
                     root._notify("Break Over", "Time to focus!")
                     root.mode = 0
@@ -284,6 +295,7 @@ PluginComponent {
                     width: parent.width
                     horizontalAlignment: Text.AlignHCenter
                     text: {
+                        if (root.isIdle && root._breakPending) return "Break Ready"
                         if (root.isIdle)     return "Pomodoro Timer"
                         if (root.isWork)     return "Work"
                         if (root.mode === 3) return "Long Break"
@@ -390,7 +402,14 @@ PluginComponent {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.isIdle ? root.startWork() : root.togglePause()
+                            onClicked: {
+                                if (root.isIdle) {
+                                    if (root._breakPending) root.startBreak()
+                                    else root.startWork()
+                                } else {
+                                    root.togglePause()
+                                }
+                            }
                         }
                     }
 
