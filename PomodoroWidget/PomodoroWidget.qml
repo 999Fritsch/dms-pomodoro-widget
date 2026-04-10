@@ -432,15 +432,26 @@ PluginComponent {
                 // ── Session dots ─────────────────────────────────────────
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 7
+                    spacing: 0
 
                     Repeater {
                         model: root.pomosUntilLong
-                        delegate: Rectangle {
-                            width: 9; height: 9; radius: 5
-                            color: index < (root.pomodorosDone % root.pomosUntilLong)
-                                   ? Theme.primary
-                                   : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.25)
+                        delegate: Item {
+                            width: 20; height: 20
+
+                            Rectangle {
+                                width: 9; height: 9; radius: 5
+                                anchors.centerIn: parent
+                                color: index < (root.pomodorosDone % root.pomosUntilLong)
+                                       ? Theme.primary
+                                       : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.25)
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.pomodorosDone = index + 1
+                            }
                         }
                     }
                 }
